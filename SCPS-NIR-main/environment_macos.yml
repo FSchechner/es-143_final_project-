@@ -1,0 +1,18 @@
+name: scps_nir
+channels:
+  - pytorch
+  - conda-forge
+dependencies:
+  - python=3.8
+  - pytorch
+  - torchvision
+  - configargparse
+  - matplotlib
+  - imageio
+  - pyyaml
+  - tensorboard
+  - scipy
+  - scikit-image
+  - pip
+  - pip:
+    - opencv-python-headless
