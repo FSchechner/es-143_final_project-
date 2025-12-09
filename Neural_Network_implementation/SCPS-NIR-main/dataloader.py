@@ -228,27 +228,35 @@ class Data_Loader(Dataset):
 
     @staticmethod
     def get_unitsphere_normal():
-        data_dict = load_diligent.load_unitsphere()
-        mask = torch.tensor(data_dict['mask'], dtype=torch.float32)
-        gt_normal = torch.tensor(data_dict['gt_normal'], dtype=torch.float32)
-        valid_idx = torch.where(mask > 0.5)
-        invalid_idx = torch.where(mask < 0.5)
-        valid_gt_normal = gt_normal[valid_idx]
-        return valid_gt_normal, valid_idx, invalid_idx
+        try:
+            data_dict = load_diligent.load_unitsphere()
+            mask = torch.tensor(data_dict['mask'], dtype=torch.float32)
+            gt_normal = torch.tensor(data_dict['gt_normal'], dtype=torch.float32)
+            valid_idx = torch.where(mask > 0.5)
+            invalid_idx = torch.where(mask < 0.5)
+            valid_gt_normal = gt_normal[valid_idx]
+            return valid_gt_normal, valid_idx, invalid_idx
+        except:
+            # Return None if unit sphere data is not available
+            return None, None, None
 
     @staticmethod
     def get_unitsphere_bounding_box_int():
-        data_dict = load_diligent.load_unitsphere()
-        mask = data_dict['mask']
+        try:
+            data_dict = load_diligent.load_unitsphere()
+            mask = data_dict['mask']
 
-        valididx = np.where(mask > 0.5)
-        xmin = valididx[0].min()
-        xmax = valididx[0].max()
-        ymin = valididx[1].min()
-        ymax = valididx[1].max()
+            valididx = np.where(mask > 0.5)
+            xmin = valididx[0].min()
+            xmax = valididx[0].max()
+            ymin = valididx[1].min()
+            ymax = valididx[1].max()
 
-        xmin = max(0, xmin - 1)
-        xmax = min(xmax + 2, mask.shape[0])
-        ymin = max(0, ymin - 1)
-        ymax = min(ymax + 2, mask.shape[1])
-        return xmin, xmax, ymin, ymax
+            xmin = max(0, xmin - 1)
+            xmax = min(xmax + 2, mask.shape[0])
+            ymin = max(0, ymin - 1)
+            ymax = min(ymax + 2, mask.shape[1])
+            return xmin, xmax, ymin, ymax
+        except:
+            # Return None if unit sphere data is not available
+            return None

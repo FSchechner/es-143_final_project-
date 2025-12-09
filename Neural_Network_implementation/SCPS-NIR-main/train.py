@@ -18,10 +18,7 @@ from models import totalVariation, Spherical_Gaussian, totalVariation_L2, Light_
 
 from cfgnode import CfgNode
 from dataloader import Data_Loader
-from load_diligent import load_diligent
-from load_lightstage import load_lightstage
-from load_apple import load_apple
-from load_sythn import load_sythn
+# Dataset loaders imported conditionally to avoid unnecessary dependencies
 from position_encoder import get_embedding_function
 
 from utils import writer_add_image
@@ -241,41 +238,43 @@ def train(input_data, testing):
         writer_add_image(os.path.join(log_path_brdf_spec, 'est_brdf_spec_%03d.png' % eval_idx), epoch, writer)
 
         ################ Get Specular on Unit Sphere ################
-        if cfg.models.specular.type == 'Spherical_Gaussian':
-            random_i = int(output_spec_mu.shape[0]*0.53)
-            mu_random_point = output_spec_mu[random_i:random_i+1, :, :].repeat(unit_sphere_normal.shape[0], 1, 1)
-            in_ld = torch.tensor([[0.3,-0.3,-0.90554]]).to(device)
-            output_unit_spe_basis = specular_model(
-                light=in_ld.repeat(unit_sphere_normal.size(0), 1),
-                normal=unit_sphere_normal.to(device),
-                # mu=torch.ones_like(unit_sphere_normal[:, None, :(1 if cfg.dataset.gray_scale else 3)].to(device)),
-                mu=mu_random_point,
-            )
-        if cfg.models.specular.type == 'Spherical_Gaussian_Var' or cfg.models.specular.type == 'Microfacet_BRDF':
-            output_unit_spe_basis = specular_model(
-                light=input_light_direction[:1, :].repeat(unit_sphere_normal.size(0), 1),
-                normal=unit_sphere_normal.to(device),
-                k=torch.ones_like(unit_sphere_normal[..., :1].to(device))*(0.1),
-                mu=torch.ones_like(unit_sphere_normal[:, None, :(1 if cfg.dataset.gray_scale else 3)].to(device)),
-            )
-            output_unit_spe_basis = output_unit_spe_basis[:, None, :]
-        for basis_idx in range(output_unit_spe_basis.size(1)):
+        # Skip unit sphere visualization if data is not available
+        if unit_sphere_normal is not None:
+            if cfg.models.specular.type == 'Spherical_Gaussian':
+                random_i = int(output_spec_mu.shape[0]*0.53)
+                mu_random_point = output_spec_mu[random_i:random_i+1, :, :].repeat(unit_sphere_normal.shape[0], 1, 1)
+                in_ld = torch.tensor([[0.3,-0.3,-0.90554]]).to(device)
+                output_unit_spe_basis = specular_model(
+                    light=in_ld.repeat(unit_sphere_normal.size(0), 1),
+                    normal=unit_sphere_normal.to(device),
+                    # mu=torch.ones_like(unit_sphere_normal[:, None, :(1 if cfg.dataset.gray_scale else 3)].to(device)),
+                    mu=mu_random_point,
+                )
+            if cfg.models.specular.type == 'Spherical_Gaussian_Var' or cfg.models.specular.type == 'Microfacet_BRDF':
+                output_unit_spe_basis = specular_model(
+                    light=input_light_direction[:1, :].repeat(unit_sphere_normal.size(0), 1),
+                    normal=unit_sphere_normal.to(device),
+                    k=torch.ones_like(unit_sphere_normal[..., :1].to(device))*(0.1),
+                    mu=torch.ones_like(unit_sphere_normal[:, None, :(1 if cfg.dataset.gray_scale else 3)].to(device)),
+                )
+                output_unit_spe_basis = output_unit_spe_basis[:, None, :]
+            for basis_idx in range(output_unit_spe_basis.size(1)):
+                rgb_map = torch.zeros((512, 612, 1 if cfg.dataset.gray_scale else 3), dtype=torch.float32, device=device)
+                rgb_map[unit_sphere_idxp] = output_unit_spe_basis[:, basis_idx, :]
+                rgb_map = rgb_map / rgb_map.max()
+                rgb_map = rgb_map.cpu().numpy()
+                rgb_map = np.clip(rgb_map * 255., 0., 255.).astype(np.uint8)[:, :, ::-1]
+                rgb_map[unit_sphere_invalididxp] = 255
+                rgb_map = rgb_map[unit_sphere_bounding_box_int[0]:unit_sphere_bounding_box_int[1], unit_sphere_bounding_box_int[2]:unit_sphere_bounding_box_int[3]]
+                cv.imwrite(os.path.join(log_path_brdf_spec, 'est_brdf_spec_basis%03d_%03d.png' % (basis_idx, eval_idx)), rgb_map)
             rgb_map = torch.zeros((512, 612, 1 if cfg.dataset.gray_scale else 3), dtype=torch.float32, device=device)
-            rgb_map[unit_sphere_idxp] = output_unit_spe_basis[:, basis_idx, :]
+            rgb_map[unit_sphere_idxp] = output_unit_spe_basis.sum(dim=1)
             rgb_map = rgb_map / rgb_map.max()
             rgb_map = rgb_map.cpu().numpy()
             rgb_map = np.clip(rgb_map * 255., 0., 255.).astype(np.uint8)[:, :, ::-1]
-            rgb_map[unit_sphere_invalididxp] = 255
-            rgb_map = rgb_map[unit_sphere_bounding_box_int[0]:unit_sphere_bounding_box_int[1], unit_sphere_bounding_box_int[2]:unit_sphere_bounding_box_int[3]]
-            cv.imwrite(os.path.join(log_path_brdf_spec, 'est_brdf_spec_basis%03d_%03d.png' % (basis_idx, eval_idx)), rgb_map)
-        rgb_map = torch.zeros((512, 612, 1 if cfg.dataset.gray_scale else 3), dtype=torch.float32, device=device)
-        rgb_map[unit_sphere_idxp] = output_unit_spe_basis.sum(dim=1)
-        rgb_map = rgb_map / rgb_map.max()
-        rgb_map = rgb_map.cpu().numpy()
-        rgb_map = np.clip(rgb_map * 255., 0., 255.).astype(np.uint8)[:, :, ::-1]
-        rgb_map[unit_sphere_invalididxp] = 70
-        rgb_map = rgb_map[unit_sphere_bounding_box_int[0]-5:unit_sphere_bounding_box_int[1]+5, unit_sphere_bounding_box_int[2]-5:unit_sphere_bounding_box_int[3]+5]
-        cv.imwrite(os.path.join(log_path_brdf_spec, 'est_brdf_spec_basisSum_%03d.png' % eval_idx), rgb_map)
+            rgb_map[unit_sphere_invalididxp] = 70
+            rgb_map = rgb_map[unit_sphere_bounding_box_int[0]-5:unit_sphere_bounding_box_int[1]+5, unit_sphere_bounding_box_int[2]-5:unit_sphere_bounding_box_int[3]+5]
+            cv.imwrite(os.path.join(log_path_brdf_spec, 'est_brdf_spec_basisSum_%03d.png' % eval_idx), rgb_map)
         ########################################################
 
         rgb_map = torch.zeros((h, w, 1 if cfg.dataset.gray_scale else 3), dtype=torch.float32, device=device)
@@ -377,7 +376,12 @@ if __name__ == "__main__":
         torch.cuda.manual_seed_all(cfg.experiment.randomseed)
     if configargs.cuda is not None:
         cfg.experiment.cuda = "cuda:" + configargs.cuda
-    device = torch.device(cfg.experiment.cuda)
+    # Use CPU if CUDA is not available (e.g., on macOS)
+    if torch.cuda.is_available():
+        device = torch.device(cfg.experiment.cuda)
+    else:
+        device = torch.device("cpu")
+        print("CUDA not available, using CPU")
 
     log_path = os.path.expanduser(cfg.experiment.log_path)
     data_path = os.path.expanduser(cfg.dataset.data_path)
@@ -396,13 +400,20 @@ if __name__ == "__main__":
     ##########################
     # Build data loader
     if 'pmsData' in data_path or 'DiLiGenT' in data_path:
+        from load_diligent import load_diligent
         input_data_dict = load_diligent(data_path, cfg)
     elif 'LightStage' in data_path:
+        from load_lightstage import load_lightstage
         input_data_dict = load_lightstage(data_path, scale=1)
     elif 'Apple' in data_path:
+        from load_apple import load_apple
         input_data_dict = load_apple(data_path, scale=1)
     elif 'Sythn' in data_path:
+        from load_sythn import load_sythn
         input_data_dict = load_sythn(cfg.dataset.syn_obj, cfg.dataset.light_index, cfg.dataset.material_idx)
+    elif 'cat' in data_path or 'Cat' in data_path:
+        from load_cat import load_cat
+        input_data_dict = load_cat(data_path, cfg)
     else:
         raise NotImplementedError('Unknown dataset')
     training_data_loader = Data_Loader(
@@ -484,7 +495,7 @@ if __name__ == "__main__":
     specular_model.to(device)
 
     if cfg.models.light_model.type == 'None':
-        light_model = Light_Model(light_init=light_init, num_rays=np.count_nonzero(input_data_dict['mask']), requires_grad=True)
+        light_model = Light_Model(light_init=light_init, num_rays=training_data_loader.num_valid_rays, requires_grad=True)
         light_model.to(device)
     elif cfg.models.light_model.type == 'Light_Model_CNN':
         light_model = Light_Model_CNN(
@@ -506,7 +517,7 @@ if __name__ == "__main__":
         ckpt = torch.load(model_checkpoint_pth, map_location=device)
         light_model.load_state_dict(ckpt['model_state_dict'])
         light_model.set_images(
-            num_rays=np.count_nonzero(input_data_dict['mask']),
+            num_rays=training_data_loader.num_valid_rays,
             images=training_data_loader.get_all_masked_images(),
             device=device,
         )
