@@ -414,6 +414,9 @@ if __name__ == "__main__":
     elif 'cat' in data_path or 'Cat' in data_path:
         from load_cat import load_cat
         input_data_dict = load_cat(data_path, cfg)
+    elif 'shoe' in data_path or 'Shoe' in data_path:
+        from load_shoe import load_shoe
+        input_data_dict = load_shoe(data_path, cfg)
     else:
         raise NotImplementedError('Unknown dataset')
     training_data_loader = Data_Loader(
