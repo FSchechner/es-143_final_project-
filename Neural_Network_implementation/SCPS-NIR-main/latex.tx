@@ -1,1 +1,21 @@
-can yo
+\section{SCPS-NIR: Self-Calibrating Photometric Stereo by Neural Inverse Rendering}
+
+\subsection{Paper Overview}
+
+The SCPS-NIR method, introduced by Li and Li (ECCV 2022), addresses the uncalibrated photometric stereo problem through neural inverse rendering. Traditional photometric stereo requires precise knowledge of light source positions and intensities, which is difficult to obtain in practice. SCPS-NIR jointly estimates surface normals, surface reflectance properties, light directions, and light intensities from a set of images captured under unknown lighting conditions.
+
+The approach employs a neural radiance field (NeRF-inspired) architecture that represents surface properties as continuous functions. The network takes 2D image coordinates as input and outputs surface normals, diffuse albedo, and specular reflectance coefficients. A separate light estimation network predicts lighting parameters for each captured image. The specular BRDF is modeled using Spherical Gaussian basis functions with trainable sharpness parameters, allowing the system to represent complex material properties including both diffuse and specular reflection.
+
+Training is performed through differentiable rendering: the predicted surface and lighting properties are used to synthesize images, which are compared against the input photographs via photometric loss. Additional regularization terms encourage smooth normal fields and physically plausible reflectance. The method demonstrates state-of-the-art performance on standard benchmarks including the DiLiGenT dataset, achieving accurate surface normal estimation without requiring calibration targets or prior knowledge of lighting conditions.
+
+\subsection{Implementation and Adaptations}
+
+We successfully implemented SCPS-NIR on a custom photometric stereo dataset (Cat dataset) consisting of 20 images captured under different lighting conditions. The original codebase was designed for specific benchmark datasets with known characteristics, requiring several adaptations for compatibility with new data.
+
+Our implementation required creating a custom dataloader that properly formats image data, binary masks, and light direction metadata according to SCPS-NIR's expected input structure. The Cat dataset provides initial light directions estimated from calibration spheres but lacks intensity measurements; we therefore initialized light intensities to uniform values, allowing the network's self-calibrating mechanism to refine both directions and intensities during training. The Cat dataset uses a different coordinate system convention and file organization compared to the benchmark datasets, necessitating appropriate transformations. We implemented coordinate system conversions to align with the neural network's expectations and ensured proper handling of masked regions corresponding to the object's silhouette.
+
+Environment compatibility presented additional challenges, as the original implementation assumes CUDA-enabled GPU hardware. We adapted the training pipeline to function on CPU-only systems by implementing automatic device detection and fallback mechanisms. This involved modifying the device initialization logic and ensuring all tensor operations gracefully handle CPU execution.
+
+A critical issue emerged from dimensional mismatches between different processing stages. The light estimation network and surface property network expected consistent tensor dimensions corresponding to valid surface points. We identified and resolved inconsistencies in how shadow-masked pixels were handled across different components, ensuring that the number of rays processed by the light model matched the number of valid surface points after shadow filtering. These modifications maintained the mathematical correctness of the algorithm while enabling compatibility with datasets of arbitrary dimensions.
+
+The successful training demonstrates that SCPS-NIR's architecture generalizes effectively to new datasets when proper data preprocessing and dimensional consistency are maintained. Our adapted implementation produces surface normal maps, estimated lighting parameters, and material property visualizations for the Cat dataset, validating the method's applicability beyond the original benchmark scenarios.
