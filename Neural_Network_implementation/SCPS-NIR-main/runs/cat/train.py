@@ -495,7 +495,7 @@ if __name__ == "__main__":
     specular_model.to(device)
 
     if cfg.models.light_model.type == 'None':
-        light_model = Light_Model(light_init=light_init, num_rays=np.count_nonzero(input_data_dict['mask']), requires_grad=True)
+        light_model = Light_Model(light_init=light_init, num_rays=training_data_loader.num_valid_rays, requires_grad=True)
         light_model.to(device)
     elif cfg.models.light_model.type == 'Light_Model_CNN':
         light_model = Light_Model_CNN(
@@ -517,7 +517,7 @@ if __name__ == "__main__":
         ckpt = torch.load(model_checkpoint_pth, map_location=device)
         light_model.load_state_dict(ckpt['model_state_dict'])
         light_model.set_images(
-            num_rays=np.count_nonzero(input_data_dict['mask']),
+            num_rays=training_data_loader.num_valid_rays,
             images=training_data_loader.get_all_masked_images(),
             device=device,
         )

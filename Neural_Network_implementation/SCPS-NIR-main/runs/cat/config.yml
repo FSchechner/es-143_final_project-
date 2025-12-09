@@ -4,7 +4,7 @@ experiment:
   randomseed: 42
   start_epoch: 1
   end_epoch: 2000
-  batch_size: 1 * 1
+  batch_size: 8 * 1
   save_every_epoch: 500
   eval_every_iter: 50
 
@@ -13,11 +13,14 @@ dataset:
   gray_scale: false
   shadow_threshold: 0.1
   sparse_input: null
+  sparse_input_random_seed: null
 
 models:
   load_checkpoint: false
   checkpoint_path: null
-  use_mean_var: false
+  use_mean_var: true
+  use_onlydiffuse: false
+  use_onlyspecular: false
 
   nerf:
     num_layers: 8
@@ -44,11 +47,12 @@ models:
     hidden_size: 64
     skip_connect_every: 8
     load_pretrain: runs/pre_trained_LNet/model_params.pth
-    ld_noise: 5
-    li_noise: 0.1
+    ld_noise: 0
+    li_noise: 0
 
 loss:
   rgb_loss: l1
+  spec_coeff_factor: 0.0
   diff_tv_factor: 0.01
   spec_tv_factor: 0.01
   normal_tv_factor: 0.01
